@@ -1,6 +1,15 @@
 {
   "appId": "com.tuempresa.carplayer",
-  "appName": "Mi App",
+  "appName": "CarPlayer Pro",
   "webDir": "www",
-  "bundledWebRuntime": false
+  "server": {
+    "url": "https://vip.gatito1.workers.dev/",
+    "cleartext": true
+  },
+  "android": {
+    "appendUserAgent": " CarPlayerApp"
+  },
+  "ios": {
+    "appendUserAgent": " CarPlayerApp"
+  }
 }
