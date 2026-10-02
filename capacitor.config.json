@@ -1,0 +1,6 @@
+{
+  "appId": "com.tuempresa.carplayer",
+  "appName": "Mi App",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
