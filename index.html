@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reproductor CarPlayer Pro - Audio & Video HD Engine</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% {
+        box-shadow: 0 0 10px var(--glow-color, rgba(168, 85, 247, 0.4)), 
+                    inset 0 0 8px var(--glow-color, rgba(168, 85, 247, 0.2));
+        border-color: var(--border-color, rgba(168, 85, 247, 0.8));
+      }
+      50% {
+        box-shadow: 0 0 20px var(--glow-color, rgba(168, 85, 247, 0.9)), 
+                    inset 0 0 12px var(--glow-color, rgba(168, 85, 247, 0.5));
+        border-color: #ffffff;
+      }
+    }
+
+    @keyframes spin-disk-ultra {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes stop-disk-gradual {
+      from { transform: rotate(var(--stopped-angle, 0deg)); }
+      to { transform: rotate(calc(var(--stopped-angle, 0deg) + 720deg)); }
+    }
+
+    .spinning-disk {
+      animation: spin-disk-ultra 0.3s linear infinite;
+    }
+
+    .stopping-disk {
+      animation: stop-disk-gradual 1.8s cubic-bezier(0.1, 0.7, 0.1, 1) forwards;
+    }
+
+    .beat-active {
+      animation: pulse-glow 0.6s infinite ease-in-out;
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen w-screen overflow-hidden flex flex-col font-sans antialiased select-none">
+
+  <!-- CONTENEDOR PRINCIPAL FIJO PANTALLA COMPLETA -->
+  <div class="max-w-xl w-full mx-auto h-full p-3 flex flex-col gap-3 overflow-hidden">
+
+    <!-- 1. REPRODUCTOR COMPACTO Y ESTÁTICO (ARRIBA) -->
+    <header class="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl p-3.5 shadow-xl overflow-hidden shrink-0 relative">
+      <div id="player-glow" class="absolute -top-16 -left-16 w-48 h-48 bg-purple-600/20 rounded-full blur-2xl pointer-events-none transition-all duration-700"></div>
+
+      <div class="flex flex-col gap-2.5 relative z-10">
+        
+        <div class="flex items-center justify-between">
+          <span id="track-genre" class="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold border border-slate-700 whitespace-nowrap">CarPlayer Pro</span>
+          
+          <span id="playing-badge" class="bg-emerald-500/85 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 opacity-0 transition-opacity pointer-events-none">
+            <span class="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span> Reproduciendo
+          </span>
+        </div>
+
+        <!-- CONTENEDOR ÚNICO DE MEDIOS -->
+        <div id="media-display-container" class="w-full relative rounded-xl overflow-hidden bg-black flex flex-col">
+          
+          <!-- PANTALLA DE VIDEO LIMPIA -->
+          <div id="video-wrapper" style="display: none;" class="w-full h-40 md:h-48 rounded-xl overflow-hidden bg-black border border-slate-800/80 relative">
+            <video id="video-player" crossorigin="anonymous" class="w-full h-full object-cover"></video>
+          </div>
+
+          <!-- CARÁTULA DE ÁLBUM CON DISCO Y EQUIPO LG -->
+          <div id="album-cover" style="display: flex;" class="w-full h-32 md:h-40 mx-auto rounded-xl bg-slate-900/90 border border-slate-800 shadow-lg items-center justify-between px-4 md:px-6 transition-all duration-500 overflow-hidden relative">
+            
+            <!-- Disco Giratorio (Izquierda) -->
+            <div class="flex items-center justify-center relative shrink-0">
+              <img id="dvd-image" src="https://raw.githubusercontent.com/pitufoardiente000/Mp.3/main/dvd-music-disk-vector-graphic-pixabay-23.png" alt="DVD CD Disc" class="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.15)] relative z-10" />
+            </div>
+
+            <!-- Equipo LG XBOOM Actualizado (Derecha) -->
+            <div class="flex items-center justify-center relative shrink-0 max-w-[190px] md:max-w-[250px]">
+              <img src="https://raw.githubusercontent.com/juanrtrt55-design/L.g/main/IMG_20261001_234048.jpg" alt="Equipo LG XBOOM" class="w-full h-auto max-h-28 md:max-h-36 object-contain rounded-lg drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]" />
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Detalles y Controles -->
+        <div class="w-full flex flex-col justify-between gap-2">
+          <div>
+            <div class="flex justify-between items-start">
+              <div class="pr-2">
+                <h1 id="track-title" class="text-sm md:text-base font-bold tracking-tight text-white line-clamp-1">Selecciona una carpeta</h1>
+                <p id="track-artist" class="text-slate-400 text-xs font-medium mt-0.5">Importa tus carpetas por género</p>
+              </div>
+            </div>
+
+            <!-- Visualizador de Ondas en tiempo real -->
+            <div class="flex items-end gap-1 h-3 mt-1.5 mb-1">
+              <div class="bar bg-purple-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+              <div class="bar bg-indigo-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+              <div class="bar bg-purple-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+              <div class="bar bg-indigo-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+              <div class="bar bg-purple-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+              <div class="bar bg-indigo-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+              <div class="bar bg-purple-500 w-full rounded-t transition-all duration-100" style="height: 20%"></div>
+            </div>
+          </div>
+
+          <!-- Barra de Progreso -->
+          <div class="space-y-0.5">
+            <input type="range" id="progress-bar" value="0" min="0" max="100" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500">
+            <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+              <span id="current-time">0:00</span>
+              <span id="total-duration">0:00</span>
+            </div>
+          </div>
+
+          <!-- Botones de Control -->
+          <div class="flex items-center justify-between mt-0.5">
+            <div class="flex items-center gap-2">
+              <button id="btn-prev" class="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition">
+                <i data-lucide="skip-back" class="w-4 h-4"></i>
+              </button>
+              <button id="btn-play" class="p-2 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/40 transition transform active:scale-95">
+                <i data-lucide="play" id="play-icon" class="w-4 h-4 fill-current"></i>
+              </button>
+              <button id="btn-next" class="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition">
+                <i data-lucide="skip-forward" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5 text-slate-400"></i>
+              <input type="range" id="volume-bar" value="80" min="0" max="100" class="w-14 md:w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500">
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. ÚNICO ELEMENTO DESLIZABLE: LISTA DE ARCHIVOS -->
+    <main class="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-3 backdrop-blur-md flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div class="flex items-center justify-between mb-2 px-1 shrink-0">
+        <h2 class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+          <i data-lucide="list-music" class="w-3.5 h-3.5 text-purple-400"></i> Lista de Archivos
+        </h2>
+        <span id="playlist-count" class="text-[10px] text-slate-400 font-medium">0 archivos</span>
+      </div>
+
+      <div id="playlist-container" class="custom-scroll space-y-1.5 overflow-y-auto flex-1 pr-1">
+      </div>
+    </main>
+
+    <!-- 3. BARRA INFERIOR FIJA -->
+    <footer class="bg-slate-900/95 border border-slate-800 backdrop-blur-xl py-2 px-3.5 rounded-2xl shrink-0">
+      <div class="flex items-center justify-between">
+        
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <label class="flex items-center gap-1.5 cursor-pointer group">
+            <div class="relative">
+              <input type="checkbox" id="toggle-beat-color" class="sr-only peer" checked>
+              <div class="w-7 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-200 group-hover:text-white transition">Ritmo</span>
+          </label>
+
+          <label class="flex items-center gap-1.5 cursor-pointer group">
+            <div class="relative">
+              <input type="checkbox" id="toggle-twister" class="sr-only peer" checked>
+              <div class="w-7 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-200 group-hover:text-white transition">Twister</span>
+          </label>
+        </div>
+
+        <!-- BOTÓN DE IMPORTAR CARPETA POR GÉNERO (WEBKITDIRECTORY) -->
+        <div>
+          <input type="file" id="file-input" webkitdirectory directory multiple accept=".mp3,video/*,audio/mpeg" class="hidden">
+          <button onclick="document.getElementById('file-input').click()" class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium text-xs px-2.5 py-1.5 rounded-lg shadow-md transition duration-200">
+            <i data-lucide="folder-tree" class="w-3.5 h-3.5"></i>
+            <span>Carpeta Géneros</span>
+          </button>
+        </div>
+
+      </div>
+    </footer>
+
+  </div>
+
+  <audio id="audio-player" crossorigin="anonymous"></audio>
+
+  <script>
+    lucide.createIcons();
+
+    const DEFAULT_DVD_LOGO = "https://raw.githubusercontent.com/pitufoardiente000/Mp.3/main/dvd-music-disk-vector-graphic-pixabay-23.png";
+
+    let playlist = [];
+    let currentTrackIndex = 0;
+    let isPlaying = false;
+    let beatAnimationEnabled = true;
+
+    const audio = document.getElementById('audio-player');
+    const video = document.getElementById('video-player');
+    const videoWrapper = document.getElementById('video-wrapper');
+    const albumCover = document.getElementById('album-cover');
+    const dvdImage = document.getElementById('dvd-image');
+
+    const btnPlay = document.getElementById('btn-play');
+    const playIcon = document.getElementById('play-icon');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const progressBar = document.getElementById('progress-bar');
+    const volumeBar = document.getElementById('volume-bar');
+    const currentTimeEl = document.getElementById('current-time');
+    const totalDurationEl = document.getElementById('total-duration');
+    const trackTitle = document.getElementById('track-title');
+    const trackArtist = document.getElementById('track-artist');
+    const trackGenre = document.getElementById('track-genre');
+    const playingBadge = document.getElementById('playing-badge');
+    const playlistContainer = document.getElementById('playlist-container');
+    const playlistCount = document.getElementById('playlist-count');
+    const toggleBeatColor = document.getElementById('toggle-beat-color');
+    const toggleTwister = document.getElementById('toggle-twister');
+    const fileInput = document.getElementById('file-input');
+    const playerGlow = document.getElementById('player-glow');
+
+    // ==========================================
+    // MOTOR DE AUDIO: BAJO PROFUNDO + TWISTER HD
+    // ==========================================
+    let audioCtx = null;
+    let currentBass = 29;       
+    let currentTweeter = 15;    
+    let currentDolby = 6;    
+    let twisterEnabled = true;
+
+    const processed = new WeakSet();
+    const engines = [];
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioCtxClass({ latencyHint: 'playback' });
+      }
+      return audioCtx;
+    }
+
+    function attach(mediaEl) {
+      if (!mediaEl || processed.has(mediaEl)) return;
+      if (mediaEl.tagName !== 'VIDEO' && mediaEl.tagName !== 'AUDIO') return;
+
+      try {
+        const ctx = getAudioContext();
+        const source = ctx.createMediaElementSource(mediaEl);
+        const analyzer = ctx.createAnalyser();
+        analyzer.fftSize = 256;
+
+        const masterInput = ctx.createGain();
+        masterInput.gain.value = 0.35;
+
+        // Canal de Bajo Profundo
+        const bassSplitter = ctx.createGain();
+        bassSplitter.gain.value = 1.0;
+
+        const subsonicFilter = ctx.createBiquadFilter();
+        subsonicFilter.type = 'highpass';
+        subsonicFilter.frequency.value = 5; 
+        subsonicFilter.Q.value = 1.1;
+
+        const bassLowpass = ctx.createBiquadFilter();
+        bassLowpass.type = 'lowpass';
+        bassLowpass.frequency.value = 20; 
+        bassLowpass.Q.value = 1.1;
+
+        const subEngine = ctx.createBiquadFilter();
+        subEngine.type = 'lowshelf';
+        subEngine.frequency.value = 100;
+        subEngine.gain.value = 0;
+
+        const deepEngine = ctx.createBiquadFilter();
+        deepEngine.type = 'peaking';
+        deepEngine.frequency.value = 43;
+        deepEngine.Q.value = 1.1;
+        deepEngine.gain.value = 0;
+
+        const bassCompressor = ctx.createDynamicsCompressor();
+        bassCompressor.threshold.value = -18.0; 
+        bassCompressor.knee.value = 16.0;       
+        bassCompressor.ratio.value = 16.0;      
+        bassCompressor.attack.value = 0.001;    
+        bassCompressor.release.value = 0.3;
+
+        const thermalGuard = ctx.createBiquadFilter();
+        thermalGuard.type = 'peaking';
+        thermalGuard.frequency.value = 75;
+        thermalGuard.Q.value = 0.7;
+        thermalGuard.gain.value = -3.0; 
+
+        const bassOutput = ctx.createGain();
+        bassOutput.gain.value = 1.0;
+
+        // Canal Principal de Voz
+        const mainSplitter = ctx.createGain();
+        mainSplitter.gain.value = 1.0;
+
+        const clarity = ctx.createBiquadFilter();
+        clarity.type = 'peaking';
+        clarity.frequency.value = 2800;
+        clarity.gain.value = 10;
+
+        const air = ctx.createBiquadFilter();
+        air.type = 'highshelf';
+        air.frequency.value = 12000;
+        air.gain.value = 8;
+
+        const mainOutput = ctx.createGain();
+        mainOutput.gain.value = 1.1;
+
+        // Master Sum & Efectos Twister (CORREGIDO EL BUCLE AQUÍ)
+        const masterSum = ctx.createGain();
+        masterSum.gain.value = 1.0;
+
+        const tweeterNode = ctx.createBiquadFilter();
+        tweeterNode.type = 'highshelf';
+        tweeterNode.frequency.value = 10000;
+        tweeterNode.gain.value = 0;
+
+        const dolbyNode = ctx.createBiquadFilter();
+        dolbyNode.type = 'peaking';
+        dolbyNode.frequency.value = 6000;
+        dolbyNode.Q.value = 1.0;
+        dolbyNode.gain.value = 0;
+
+        const limiter = ctx.createDynamicsCompressor();
+        limiter.threshold.value = -14.0; 
+        limiter.ratio.value = 20;
+
+        // Enrutamiento de señales en paralelo
+        source.connect(masterInput);
+
+        masterInput.connect(bassSplitter);
+        bassSplitter.connect(subsonicFilter);
+        subsonicFilter.connect(bassLowpass);
+        bassLowpass.connect(subEngine);
+        subEngine.connect(deepEngine);
+        deepEngine.connect(bassCompressor);
+        bassCompressor.connect(thermalGuard);
+        thermalGuard.connect(bassOutput);
+        bassOutput.connect(masterSum);
+
+        masterInput.connect(mainSplitter);
+        mainSplitter.connect(clarity);
+        clarity.connect(air);
+        air.connect(mainOutput);
+        mainOutput.connect(masterSum);
+
+        masterSum.connect(tweeterNode);
+        tweeterNode.connect(dolbyNode);
+        dolbyNode.connect(limiter); // <--- CORREGIDO: Conectado correctamente al limitador
+
+        limiter.connect(analyzer);
+        analyzer.connect(ctx.destination);
+
+        processed.add(mediaEl);
+        const engine = {
+          mediaEl, analyzer, masterInput, subEngine, deepEngine, tweeterNode, dolbyNode, limiter,
+          lastBeatTime: 0, beatThreshold: 0
+        };
+        engines.push(engine);
+
+        applyBass(engine, currentBass);
+        applyTweeter(engine, currentTweeter);
+        applyDolby(engine, currentDolby);
+
+      } catch (err) {
+        console.warn('[Deep Bass Boost] Error al conectar audio:', err.message);
+      }
+    }
+
+    function applyBass(engine, v) {
+      if (!audioCtx) return;
+      engine.deepEngine.gain.setTargetAtTime(v * 1.2, audioCtx.currentTime, 0.25);
+      engine.subEngine.gain.setTargetAtTime(v * 0.9, audioCtx.currentTime, 0.25);
+      const vol = 0.35 - v * 0.0055;
+      engine.masterInput.gain.setTargetAtTime(Math.max(vol, 0.08), audioCtx.currentTime, 0.25);
+    }
+
+    function applyTweeter(engine, v) {
+      if (!audioCtx) return;
+      const gainVal = twisterEnabled ? v * 1.2 : 0;
+      engine.tweeterNode.gain.setTargetAtTime(gainVal, audioCtx.currentTime, 0.1);
+    }
+
+    function applyDolby(engine, v) {
+      if (!audioCtx) return;
+      engine.dolbyNode.gain.setTargetAtTime(v, audioCtx.currentTime, 0.1);
+    }
+
+    toggleTwister.addEventListener('change', (e) => {
+      twisterEnabled = e.target.checked;
+      engines.forEach(eng => applyTweeter(eng, currentTweeter));
+    });
+
+    // Bucle de animación y ecualizador visual
+    function tickBeat() {
+      if (audioCtx && isPlaying) {
+        const activeMedia = getActiveMedia();
+        const activeEngine = engines.find(e => e.mediaEl === activeMedia);
+
+        if (activeEngine && !activeMedia.paused) {
+          const dataArray = new Uint8Array(activeEngine.analyzer.frequencyBinCount);
+          activeEngine.analyzer.getByteFrequencyData(dataArray);
+
+          // Animar barras
+          const bars = document.querySelectorAll('.bar');
+          if (bars.length > 0) {
+            const step = Math.floor(dataArray.length / bars.length);
+            bars.forEach((bar, index) => {
+              const val = dataArray[index * step] || 10;
+              const heightPercent = Math.max(12, Math.min(100, (val / 255) * 100));
+              bar.style.height = `${heightPercent}%`;
+            });
+          }
+
+          // Detección de beat
+          let bassSum = 0;
+          for (let i = 0; i < 6; i++) bassSum += dataArray[i];
+          const currentBassLevel = bassSum / 6;
+
+          activeEngine.beatThreshold = activeEngine.beatThreshold * 0.97 + currentBassLevel * 0.03;
+          if (currentBassLevel > activeEngine.beatThreshold * 1.3 && (audioCtx.currentTime - activeEngine.lastBeatTime) > 0.16) {
+            activeEngine.deepEngine.gain.setTargetAtTime((currentBass * 1.2) * 1.25, audioCtx.currentTime, 0.03);
+            setTimeout(() => {
+              if (activeEngine.deepEngine) activeEngine.deepEngine.gain.setTargetAtTime(currentBass * 1.2, audioCtx.currentTime, 0.18);
+            }, 85);
+            activeEngine.lastBeatTime = audioCtx.currentTime;
+          }
+        }
+      } else {
+        document.querySelectorAll('.bar').forEach(bar => {
+          bar.style.height = '15%';
+        });
+      }
+      requestAnimationFrame(tickBeat);
+    }
+    tickBeat();
+
+    function getActiveMedia() {
+      const track = playlist[currentTrackIndex];
+      return (track && track.type === 'video') ? video : audio;
+    }
+
+    function loadTrack(index, savedTime = 0) {
+      if (playlist.length === 0) return;
+      pauseTrack();
+      currentTrackIndex = index;
+      const track = playlist[index];
+
+      if (track.type === 'video') {
+        videoWrapper.style.display = 'block';
+        albumCover.style.display = 'none';
+        video.src = track.src;
+        attach(video);
+        if (savedTime > 0) video.currentTime = savedTime;
+      } else {
+        videoWrapper.style.display = 'none';
+        albumCover.style.display = 'flex';
+        dvdImage.src = track.cover || DEFAULT_DVD_LOGO;
+        audio.src = track.src;
+        attach(audio);
+        if (savedTime > 0) audio.currentTime = savedTime;
+      }
+
+      trackTitle.textContent = track.title;
+      trackArtist.textContent = track.artist;
+      trackGenre.textContent = track.genre;
+      playerGlow.style.backgroundColor = track.color;
+
+      renderPlaylist();
+      scrollToActiveTrack();
+    }
+
+    function scrollToActiveTrack() {
+      const activeCard = playlistContainer.children[currentTrackIndex];
+      if (activeCard) {
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function renderPlaylist() {
+      playlistContainer.innerHTML = '';
+      playlistCount.textContent = `${playlist.length} archivos`;
+
+      if (playlist.length === 0) {
+        playlistContainer.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs flex flex-col items-center justify-center h-full">
+            <i data-lucide="folder-tree" class="w-8 h-8 mb-2 opacity-40"></i>
+            <span>No hay carpetas cargadas.</span>
+            <span class="text-[10px] text-slate-600 mt-1">Usa "Carpeta Géneros" para importar</span>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      playlist.forEach((track, index) => {
+        const isCurrent = index === currentTrackIndex;
+        const card = document.createElement('div');
+        
+        card.className = `group flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 cursor-pointer shrink-0 ${
+          isCurrent 
+            ? 'bg-slate-800/90 text-white border-slate-600 shadow-md' 
+            : 'bg-slate-900/40 hover:bg-slate-800/50 text-slate-300 border-slate-800/80'
+        }`;
+
+        card.style.setProperty('--glow-color', track.color + 'aa');
+        card.style.setProperty('--border-color', track.color);
+
+        if (isCurrent && isPlaying && beatAnimationEnabled) {
+          card.classList.add('beat-active');
+        }
+
+        const iconType = track.type === 'video' ? 'film' : 'disc';
+
+        card.innerHTML = `
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shadow-sm shrink-0 overflow-hidden">
+              ${isCurrent && isPlaying ? '<i data-lucide="volume-2" class="w-4 h-4 animate-bounce text-purple-400"></i>' : `<i data-lucide="${iconType}" class="w-3.5 h-3.5 text-slate-400"></i>`}
+            </div>
+            <div class="truncate">
+              <h3 class="font-semibold text-xs truncate ${isCurrent ? 'text-white' : 'text-slate-200'}">${track.title}</h3>
+              <p class="text-[10px] text-slate-400 truncate">${track.artist}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0 ml-2">
+            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-700 bg-slate-800/80" style="color:${track.color}">
+              ${track.genre}
+            </span>
+            <div class="w-5 h-5 flex items-center justify-center">
+              <i data-lucide="music" class="w-3.5 h-3.5 ${isCurrent && isPlaying ? 'animate-bounce text-purple-400' : 'text-slate-500'}"></i>
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          if (currentTrackIndex !== index) {
+            loadTrack(index);
+            playTrack();
+          } else {
+            togglePlay();
+          }
+        });
+
+        playlistContainer.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function togglePlay() {
+      if (playlist.length === 0) return;
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack();
+      }
+    }
+
+    function startDiskSpin() {
+      dvdImage.classList.remove('stopping-disk');
+      dvdImage.classList.add('spinning-disk');
+    }
+
+    function stopDiskGradual() {
+      if (!dvdImage.classList.contains('spinning-disk')) return;
+
+      const computedStyle = window.getComputedStyle(dvdImage);
+      const matrix = computedStyle.transform;
+      let angle = 0;
+
+      if (matrix && matrix !== 'none') {
+        const values = matrix.split('(')[1].split(')')[0].split(',');
+        const a = parseFloat(values[0]);
+        const b = parseFloat(values[1]);
+        angle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+        if (angle < 0) angle += 360;
+      }
+
+      dvdImage.style.setProperty('--stopped-angle', `${angle}deg`);
+      dvdImage.classList.remove('spinning-disk');
+      
+      void dvdImage.offsetWidth; 
+      dvdImage.classList.add('stopping-disk');
+    }
+
+    function playTrack() {
+      if (playlist.length === 0) return;
+      const activeMedia = getActiveMedia();
+      attach(activeMedia);
+
+      const ctx = getAudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      activeMedia.play().then(() => {
+        isPlaying = true;
+        playIcon.setAttribute('data-lucide', 'pause');
+        playingBadge.style.opacity = '1';
+        startDiskSpin();
+        lucide.createIcons();
+        renderPlaylist();
+      }).catch(err => console.log("Interacción requerida:", err));
+    }
+
+    function pauseTrack() {
+      audio.pause();
+      video.pause();
+      isPlaying = false;
+      playIcon.setAttribute('data-lucide', 'play');
+      playingBadge.style.opacity = '0';
+      stopDiskGradual();
+      lucide.createIcons();
+      renderPlaylist();
+    }
+
+    btnPlay.addEventListener('click', togglePlay);
+    btnPrev.addEventListener('click', () => {
+      if (playlist.length === 0) return;
+      currentTrackIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+      loadTrack(currentTrackIndex);
+      playTrack();
+    });
+    btnNext.addEventListener('click', () => {
+      if (playlist.length === 0) return;
+      currentTrackIndex = (currentTrackIndex + 1 + playlist.length) % playlist.length;
+      loadTrack(currentTrackIndex);
+      playTrack();
+    });
+
+    function handleTimeUpdate(media) {
+      if (!media.duration || media !== getActiveMedia()) return;
+      progressBar.value = (media.currentTime / media.duration) * 100;
+
+      const curMin = Math.floor(media.currentTime / 60);
+      const curSec = Math.floor(media.currentTime % 60);
+      currentTimeEl.textContent = `${curMin}:${curSec < 10 ? '0' : ''}${curSec}`;
+
+      const durMin = Math.floor(media.duration / 60);
+      const durSec = Math.floor(media.duration % 60);
+      totalDurationEl.textContent = `${durMin}:${durSec < 10 ? '0' : ''}${durSec}`;
+    }
+
+    audio.addEventListener('timeupdate', () => handleTimeUpdate(audio));
+    video.addEventListener('timeupdate', () => handleTimeUpdate(video));
+
+    audio.addEventListener('ended', () => {
+      stopDiskGradual();
+      btnNext.click();
+    });
+    video.addEventListener('ended', () => {
+      stopDiskGradual();
+      btnNext.click();
+    });
+
+    progressBar.addEventListener('input', () => {
+      if (playlist.length === 0) return;
+      const activeMedia = getActiveMedia();
+      activeMedia.currentTime = (progressBar.value / 100) * activeMedia.duration;
+    });
+
+    volumeBar.addEventListener('input', () => {
+      const val = volumeBar.value / 100;
+      audio.volume = val;
+      video.volume = val;
+    });
+
+    toggleBeatColor.addEventListener('change', (e) => {
+      beatAnimationEnabled = e.target.checked;
+      renderPlaylist();
+    });
+
+    // Importación de carpetas
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      const colors = ['#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+      const gradients = ['from-amber-500 to-orange-600', 'from-blue-600 to-cyan-600', 'from-violet-600 to-purple-600', 'from-fuchsia-600 to-pink-600'];
+
+      const previousLength = playlist.length;
+
+      files.forEach((file, idx) => {
+        const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|mkv)$/i.test(file.name);
+        const isMp3 = file.type === 'audio/mpeg' || /\.mp3$/i.test(file.name);
+
+        if (!isVideo && !isMp3) return;
+
+        let detectedGenre = "Música";
+        if (file.webkitRelativePath) {
+          const pathParts = file.webkitRelativePath.split('/');
+          if (pathParts.length >= 2) {
+            detectedGenre = pathParts.length >= 3 ? pathParts[pathParts.length - 2] : pathParts[0];
+          }
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+
+        playlist.push({
+          id: Date.now() + idx,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          artist: isVideo ? "Video HD" : "Audio MP3 HD",
+          duration: "--:--",
+          genre: detectedGenre.charAt(0).toUpperCase() + detectedGenre.slice(1),
+          type: isVideo ? "video" : "audio",
+          color: colors[Math.floor(Math.random() * colors.length)],
+          gradient: gradients[Math.floor(Math.random() * gradients.length)],
+          src: objectUrl,
+          cover: DEFAULT_DVD_LOGO
+        });
+      });
+
+      renderPlaylist();
+      if (!isPlaying && playlist.length > previousLength) {
+        loadTrack(previousLength > 0 ? currentTrackIndex : 0);
+      }
+    });
+
+    ['click', 'keydown', 'touchstart'].forEach(evt =>
+      document.addEventListener(evt, () => {
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') ctx.resume();
+      }, { passive: true })
+    );
+
+    renderPlaylist();
+  </script>
+</body>
+</html>
