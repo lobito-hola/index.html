@@ -1,4 +1,4 @@
-name: Compiler APK Android
+name: Compilar APK Android
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Preparar carpeta www
+      - name: Preparar carpeta web (www)
         run: |
           mkdir -p www
           cp index.html www/
@@ -40,13 +40,49 @@ jobs:
           npx cap copy android
           npx cap sync android
 
-      - name: Compilar APK con Gradle
+      - name: Parche pantalla completa (edge-to-edge)
+        run: |
+          cat > android/app/src/main/java/com/tuempresa/carplayer/MainActivity.kt << 'EOF'
+          package com.tuempresa.carplayer
+
+          import android.graphics.Color
+          import android.os.Bundle
+          import androidx.core.view.ViewCompat
+          import androidx.core.view.WindowCompat
+          import androidx.core.view.WindowInsetsCompat
+          import com.getcapacitor.BridgeActivity
+
+          class MainActivity : BridgeActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+
+                  // Edge-to-edge: la app dibuja bajo las barras de estado y navegacion
+                  WindowCompat.setDecorFitsSystemWindows(window, false)
+                  window.statusBarColor = Color.TRANSPARENT
+                  window.navigationBarColor = Color.TRANSPARENT
+
+                  // Aplicar margenes del sistema al WebView para que nada quede tapado
+                  ViewCompat.setOnApplyWindowInsetsListener(bridge.webView) { v, insets ->
+                      val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                      v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                      insets
+                  }
+              }
+          }
+          EOF
+
+          sed -i 's#android:exported="true"#android:exported="true"\n            android:windowLayoutInDisplayCutoutMode="shortEdges"#' android/app/src/main/AndroidManifest.xml
+
+      - name: Otorgar permisos a Gradle
+        run: chmod +x android/gradlew
+
+      - name: Compilar APK Debug
         run: |
           cd android
           ./gradlew assembleDebug
 
-      - name: Subir APK como Artifact
+      - name: Subir APK como artefacto de descarga
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: CarPlayerPro-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
