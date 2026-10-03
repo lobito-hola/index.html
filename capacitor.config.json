@@ -1,5 +1,5 @@
 {
-  "appId": "com.tuempresa.carplayer",
+  "appId": "com.lobito.carplayer",
   "appName": "CarPlayer Pro",
   "webDir": "www",
   "server": {
@@ -7,9 +7,6 @@
     "cleartext": true
   },
   "android": {
-    "appendUserAgent": " CarPlayerApp"
-  },
-  "ios": {
     "appendUserAgent": " CarPlayerApp"
   }
 }
