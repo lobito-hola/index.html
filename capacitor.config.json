@@ -8,5 +8,10 @@
   },
   "android": {
     "appendUserAgent": " CarPlayerApp"
+  },
+  "plugins": {
+    "MediaSession": {
+      "foregroundService": "always"
+    }
   }
 }
