@@ -1,5 +1,5 @@
 {
-  "appId": "com.lobito.carplayer",
+  "appId": "com.tuempresa.carplayer",
   "appName": "CarPlayer Pro",
   "webDir": "www",
   "server": {
@@ -8,10 +8,5 @@
   },
   "android": {
     "appendUserAgent": " CarPlayerApp"
-  },
-  "plugins": {
-    "MediaSession": {
-      "foregroundService": "always"
-    }
   }
 }
